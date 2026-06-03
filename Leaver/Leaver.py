@@ -3,9 +3,7 @@ from scipy.optimize import root
 import matplotlib.pyplot as plt
 
 
-# ============================================================
-#  UNIDADES Y PARÁMETROS
-# ============================================================
+""" Unidades y parámetros """
 
 G = 1
 c = 1
@@ -15,17 +13,13 @@ epsilon = 3      # Perturbaciones gravitacionales
 N = 5000         # Truncamiento de la fracción continua
 
 
-# ============================================================
-#  SEMILLAS DIRECTAS PARA LOS 60 MODOS
-# ============================================================
+""" Semillas para los 60 modos """
 
 n_l2_semillas = np.arange(1, 61)
 n_l3_semillas = np.arange(1, 61)
 
 
-# ------------------------------------------------------------
 # l = 2
-# ------------------------------------------------------------
 
 semillas_l2 = np.array([
     0.7473433688360837 - 0.1779246313778714j,
@@ -91,9 +85,7 @@ semillas_l2 = np.array([
 ])
 
 
-# ------------------------------------------------------------
 # l = 3
-# ------------------------------------------------------------
 
 semillas_l3 = np.array([
     1.1988865768749801 - 0.1854060958898952j,
@@ -160,9 +152,7 @@ semillas_l3 = np.array([
 ])
 
 
-# ============================================================
-#  COEFICIENTES DE LA RECURRENCIA
-# ============================================================
+""" Funciones para calcular los coefs. de la recurrencia """
 
 def Calc_alpha(w, N):
     p = -1j * w
@@ -201,20 +191,13 @@ def Calc_gamma(w, N):
     return gamma
 
 
-# ============================================================
-#  ECUACIÓN CARACTERÍSTICA DE LEAVER
-# ============================================================
+""" Implementamos la ecuación característica de Leaver """
+#n_inversion = 0 -> fracción continua original.
+#n_inversion = 1 -> primera inversión.
+#n_inversion = 2 -> segunda inversión.
+#...
 
 def F(x, n_inversion, l):
-    """
-    Ecuación característica de Leaver.
-
-    n_inversion = 0 -> fracción continua original.
-    n_inversion = 1 -> primera inversión.
-    n_inversion = 2 -> segunda inversión.
-    ...
-    """
-
     w = x[0] + 1j*x[1]
 
     alpha = Calc_alpha(w, N)
@@ -251,19 +234,9 @@ def F(x, n_inversion, l):
     return np.array([F_complex.real, F_complex.imag])
 
 
-# ============================================================
-#  CÁLCULO DE UNA RAÍZ
-# ============================================================
+""" Implementamos el algoritmo de búsqueda de raíces """
 
 def Calc_w(n_Leaver, omega_guess, l):
-    """
-    En la tabla de Leaver:
-        n_Leaver = 1, 2, 3, ...
-
-    En la fracción continua:
-        n_inversion = n_Leaver - 1
-    """
-
     n_inversion = n_Leaver - 1
 
     x0 = np.array([
@@ -291,16 +264,9 @@ def Calc_w(n_Leaver, omega_guess, l):
     return omega, sol
 
 
-# ============================================================
-#  CÁLCULO DIRECTO DE UNA FAMILIA
-# ============================================================
+""" Implementamos el algoritmo de cálculo sistemático de todos los modos """
 
 def calcular_familia_directa(l, n_semillas, semillas):
-    """
-    Calcula directamente los modos de una familia usando una lista
-    explícita de 60 semillas, sin interpolaciones ni linspaces.
-    """
-
     frecuencias = []
     residuos = []
     convergencias = []
@@ -335,9 +301,7 @@ def calcular_familia_directa(l, n_semillas, semillas):
     )
 
 
-# ============================================================
-#  EJECUCIÓN
-# ============================================================
+""" Main """
 
 n_l2, frec_l2, res_l2, conv_l2 = calcular_familia_directa(
     l=2,
@@ -352,9 +316,7 @@ n_l3, frec_l3, res_l3, conv_l3 = calcular_familia_directa(
 )
 
 
-# ============================================================
-#  GUARDAR RESULTADOS
-# ============================================================
+""" Guardamos los resultados """
 
 datos_l2 = np.column_stack([
     n_l2,
@@ -394,9 +356,7 @@ print("Archivo l=2: resultados_leaver_l2_60modos.txt")
 print("Archivo l=3: resultados_leaver_l3_60modos.txt")
 
 
-# ============================================================
-#  GRÁFICA FINAL
-# ============================================================
+""" Gráfica final """
 
 plt.figure(figsize=(8, 6))
 
