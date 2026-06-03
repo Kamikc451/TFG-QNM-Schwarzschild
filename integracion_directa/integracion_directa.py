@@ -4,40 +4,25 @@ from scipy.special import lambertw
 from scipy.integrate import solve_ivp
 from scipy.optimize import root
 
-""" Unidades Geométricas """
-c = 1
-G = 1
-
-M = 1
-
-""" Parámetros del Modo """
-
-l = 10
-
-""" Parámetros """
-
-a_len = 50
-b_len = 50
-
-w_guess = 0.8 - 0.09j
-
 
 """
 Cambios de coordenadas
 """
 
 def Calc_r_tort(r , M):
+    #Cambio r -> r*
     return r + 2*M * np.log(r /(2*M) - 1)
 
 
 def Calc_r(r_tort):
+    #Cambio r* -> r
     z = np.exp(r_tort/(2*M) - 1)
     r = 2*M*(lambertw(z, 0).real + 1)
     return r
 
 
 """
-Funciones útiles (f, f' y poteencial)
+Funciones útiles (f, f')
 """
 
 def f(r, M):
@@ -45,9 +30,6 @@ def f(r, M):
 
 def df(r, M):
     return 2*M/r**2
-
-def Calc_V_axial(r):
-    return (1 - 2*M/r) * (l*(l+1)/r**2 - 6*M/r**3)
 
 
 """
@@ -112,7 +94,10 @@ def Construir_dU(r, w, b_coefs):
         U += n * b_coefs[n] * y**(n-1)
     return U
 
-""" Funciones para el solver (integrar) """
+""" Implementamos la ecuación de Regge-Wheeler """
+
+def Calc_V_axial(r):
+    return (1 - 2*M/r) * (l*(l+1)/r**2 - 6*M/r**3)
 
 def R_W(r_tort, Y, w):
         
@@ -128,32 +113,9 @@ def R_W(r_tort, Y, w):
     return np.array([du, dv], dtype=complex)
 
 
+""" Funciones que aproximan f+ f- y sus derivadas en su extremo """
 
-""" Mallados radiales"""
-
-N = 500
-N_match = 250
-
-r_tort_min = -100*M 
-r_tort_max =  100*M
-
-r_tort = np.linspace(r_tort_min, r_tort_max, N)
-
-r = Calc_r(r_tort)
-
-""" Centros de las series y matching point """
-
-r_tort_h = r_tort_min
-r_tort_inf = r_tort_max
-
-r_h = Calc_r(r_tort_h)
-r_inf = Calc_r(r_tort_inf)
-
-r_tort_match = r_tort[N_match]
-
-""" Calculamos la solución inicial en los extremos """
-
-def Calc_Y_h(a_len, w, l, M, r_h, r_tort):
+def Calc_Y_h(a_len, w, l, M, r_h, r_tort_h):
     a_coefs = Calc_a_coefs(a_len, w, l, M)
     
     S = Construir_S(r_h, w, a_coefs)
@@ -165,7 +127,7 @@ def Calc_Y_h(a_len, w, l, M, r_h, r_tort):
     Y_h = np.array([f_menos, df_menos], dtype= complex)
     return Y_h
 
-def Calc_Y_inf(b_len, w, l, M, r_inf, r_tort):
+def Calc_Y_inf(b_len, w, l, M, r_inf, r_tort_inf):
     b_coefs = Calc_b_coefs(b_len, w, l, M)
     
     U = Construir_U(r_inf, w, b_coefs)
@@ -177,7 +139,7 @@ def Calc_Y_inf(b_len, w, l, M, r_inf, r_tort):
     Y_inf = np.array([f_mas, df_mas], dtype= complex)
     return Y_inf
 
-""" Integramos desde el horizonte """
+""" Integración desde el horizonte hasta el punto de matching """
 def integrar_h(r_tort_min, r_tort_match, Y_h, w):
     intervalo_h = np.array([r_tort_min, r_tort_match])
     paso = abs(r_tort[1] - r_tort[0])
@@ -189,7 +151,7 @@ def integrar_h(r_tort_min, r_tort_match, Y_h, w):
     dPsi_h_match = sol_h.y[1, -1]
     return (Psi_h_match, dPsi_h_match)
 
-""" Integramos desde el infinito """
+""" Integración desde el infinito hasta el punto de matching """
 def integrar_inf(r_tort_max, r_tort_match, Y_inf, w):
     intervalo_inf = np.array([r_tort_max, r_tort_match])
     paso = abs(r_tort[1] - r_tort[0])
@@ -202,48 +164,63 @@ def integrar_inf(r_tort_max, r_tort_match, Y_inf, w):
     return (Psi_inf_match, dPsi_inf_match)
 
 
-""" Calculamos el Wronskiano """
-def Calc_W(Psi_h_match, dPsi_h_match, Psi_inf_match, dPsi_inf_match):
-    W = Psi_h_match * dPsi_inf_match - Psi_inf_match * dPsi_h_match
-    return W
+""" Implementamos el Wronskiano (la función del sistema F(x) = 0) """
 
-""" Calculamos las raíces del sistema F(x) = 0 """
-
-"""
 def F(w_vec):
 
     w = w_vec[0] + 1j*w_vec[1]
     
-    Y_h = Calc_Y_h(a_len, w, l, M, r_h, r_tort)
-    Y_inf = Calc_Y_inf(b_len, w, l, M, r_inf, r_tort)
+    Y_h = Calc_Y_h(a_len, w, l, M, r_h, r_tort_h)
+    Y_inf = Calc_Y_inf(b_len, w, l, M, r_inf, r_tort_inf)
     
     Psi_h_match, dPsi_h_match = integrar_h(r_tort_min, r_tort_match, Y_h, w)
     Psi_inf_match, dPsi_inf_match = integrar_inf(r_tort_max, r_tort_match, Y_inf, w)
     
-    W = Calc_W(Psi_h_match, dPsi_h_match, Psi_inf_match, dPsi_inf_match)
+    W = Psi_h_match * dPsi_inf_match - Psi_inf_match * dPsi_h_match
     
     return np.array([W.real, W.imag])
-"""
 
-def F(w_vec):
+""" Main """
 
-    w = w_vec[0] + 1j*w_vec[1]
+#Unidades geométricas
+c = 1
+G = 1
 
-    Y_h = Calc_Y_h(a_len, w, l, M, r_h, r_tort)
-    Y_inf = Calc_Y_inf(b_len, w, l, M, r_inf, r_tort)
+M = 1
 
-    Psi_h, dPsi_h = integrar_h(r_tort_min, r_tort_match, Y_h, w)
-    Psi_inf, dPsi_inf = integrar_inf(r_tort_max, r_tort_match, Y_inf, w)
+#Parámetros del Modo
+l = 2
+w_guess = 0.37 - 0.09j
 
-    q_h = dPsi_h / Psi_h
-    q_inf = dPsi_inf / Psi_inf
+#Número de coeficientes de las series
+a_len = 50
+b_len = 50
 
-    R = q_h - q_inf
 
-    return np.array([R.real, R.imag])
+#Mallados radiales
+N = 500
+
+r_tort_min = -100*M 
+r_tort_max =  100*M
+
+r_tort = np.linspace(r_tort_min, r_tort_max, N)
+
+r = Calc_r(r_tort)
+
+#Radios donde centramos las serie
+r_tort_h = r_tort_min
+r_tort_inf = r_tort_max
+
+r_h = Calc_r(r_tort_h)
+r_inf = Calc_r(r_tort_inf)
+
+#Punto de matching
+N_match = 250
+r_tort_match = r_tort[N_match]
+
+""" Calculamos las raíces de la función F(x) = 0 """
 
 x0 = np.array([w_guess.real, w_guess.imag])
-
 sol_root = root(F, x0)
 
 print("success =", sol_root.success)
@@ -256,11 +233,12 @@ print("residuo final =", F(sol_root.x))
 
 
 
+
 """ Reconstrucción de las soluciones radiales para omega encontrada """
 
 # Construimos las condiciones iniciales en los extremos usando la frecuencia encontrada
-Y_h = Calc_Y_h(a_len, w_sol, l, M, r_h, r_tort)
-Y_inf = Calc_Y_inf(b_len, w_sol, l, M, r_inf, r_tort)
+Y_h = Calc_Y_h(a_len, w_sol, l, M, r_h, r_tort_h)
+Y_inf = Calc_Y_inf(b_len, w_sol, l, M, r_inf, r_tort_inf)
 
 # Mallados para guardar la solución completa
 N_plot = 1000
@@ -299,9 +277,6 @@ f_menos_plot = sol_h_full.y[0]
 r_tort_inf_plot = sol_inf_full.t
 f_mas_plot = sol_inf_full.y[0]
 
-# ------------------------------------------------------------
-# Normalización en el punto de matching
-# ------------------------------------------------------------
 
 # Factor complejo para que f_+ coincida con f_- en el punto de matching
 C = f_menos_plot[-1] / f_mas_plot[-1]
@@ -313,9 +288,7 @@ f_mas_matched = C * f_mas_plot
 f_menos_norm = f_menos_plot / f_menos_plot[-1]
 f_mas_norm = f_mas_matched / f_menos_plot[-1]
 
-# ------------------------------------------------------------
-# Construcción de una solución radial Q uniendo ambas ramas
-# ------------------------------------------------------------
+
 
 # La rama desde infinito está en orden decreciente de r_*
 # La ordenamos de menor a mayor para poder unirla con la rama del horizonte
@@ -329,10 +302,9 @@ f_mas_sorted = f_mas_norm[idx_inf]
 r_Q = np.concatenate([r_tort_h_plot, r_inf_sorted[1:]])
 Q_plot = np.concatenate([f_menos_norm, f_mas_sorted[1:]])
 
-# ------------------------------------------------------------
-# Gráficas de f_- y f_+ normalizadas
-# ------------------------------------------------------------
 
+
+# Gráficas de f_- y f_+ normalizadas
 plt.figure()
 plt.plot(r_tort_h_plot, np.abs(f_menos_norm), "-", label=r"$f_-$ desde el horizonte")
 plt.plot(r_tort_inf_plot, np.abs(f_mas_norm), "-", label=r"$f_+$ desde el infinito")
@@ -366,10 +338,8 @@ plt.title(r"Parte imaginaria de las soluciones normalizadas")
 plt.tight_layout()
 plt.show()
 
-# ------------------------------------------------------------
-# Gráficas de la solución radial reconstruida Q
-# ------------------------------------------------------------
 
+# Gráficas de la solución radial reconstruida Q
 plt.figure()
 plt.plot(r_Q, np.abs(Q_plot), "-")
 plt.axvline(r_tort_match, color="k", linestyle=":")
@@ -390,11 +360,7 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# ------------------------------------------------------------
-# Opcional: módulo de Q en escala logarítmica
-# Útil si el crecimiento hacia los extremos domina demasiado la figura
-# ------------------------------------------------------------
-
+#Módulo de Q en escala logarítmica
 plt.figure()
 plt.semilogy(r_Q, np.abs(Q_plot), "-")
 plt.axvline(r_tort_match, color="k", linestyle=":")
